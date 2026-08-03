@@ -74,6 +74,15 @@ enum DispatchStatus {
   CANCELLED
 }
 
+enum DispatchRunStatus {
+  DRAFT
+  LOADING
+  FINALIZED
+  DISPATCHED
+  COMPLETED
+  CANCELLED
+}
+
 enum DeliveryStopStatus {
   PENDING
   ARRIVED
@@ -129,6 +138,7 @@ model Product {
   dispatchItems       DispatchItem[]
   deliveryStopItems   DeliveryStopItem[]
   reconciliationItems DispatchReconciliationItem[]
+  dispatchRunItems    DispatchRunItem[]
 
   @@unique([distributorId, sku])
   @@index([distributorId, isActive])
@@ -173,11 +183,12 @@ model Shop {
   createdAt        DateTime   @default(now())
   updatedAt        DateTime   @updatedAt
 
-  distributor   Distributor    @relation(fields: [distributorId], references: [id], onDelete: Cascade)
-  route         Route?         @relation(fields: [routeId], references: [id], onDelete: SetNull)
-  orders        Order[]
-  demandSignals DemandSignal[]
-  deliveryStops DeliveryStop[]
+  distributor      Distributor       @relation(fields: [distributorId], references: [id], onDelete: Cascade)
+  route            Route?            @relation(fields: [routeId], references: [id], onDelete: SetNull)
+  orders           Order[]
+  demandSignals    DemandSignal[]
+  deliveryStops    DeliveryStop[]
+  dispatchRunShops DispatchRunShop[]
 
   @@unique([distributorId, phone])
   @@index([distributorId, status])
@@ -246,11 +257,12 @@ model DemandSignal {
   createdAt           DateTime     @default(now())
   updatedAt           DateTime     @updatedAt
 
-  distributor   Distributor        @relation(fields: [distributorId], references: [id], onDelete: Cascade)
-  shop          Shop               @relation(fields: [shopId], references: [id], onDelete: Cascade)
-  route         Route?             @relation(fields: [routeId], references: [id], onDelete: SetNull)
-  items         DemandSignalItem[]
-  deliveryStops DeliveryStop[]
+  distributor            Distributor        @relation(fields: [distributorId], references: [id], onDelete: Cascade)
+  shop                   Shop               @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  route                  Route?             @relation(fields: [routeId], references: [id], onDelete: SetNull)
+  items                  DemandSignalItem[]
+  deliveryStops          DeliveryStop[]
+  dispatchRunAssignments DispatchRunShop[]
 
   @@index([distributorId, targetDate])
   @@index([shopId, targetDate])
@@ -289,8 +301,9 @@ model Vehicle {
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
 
-  distributor Distributor @relation(fields: [distributorId], references: [id], onDelete: Cascade)
-  dispatches  Dispatch[]
+  distributor  Distributor   @relation(fields: [distributorId], references: [id], onDelete: Cascade)
+  dispatches   Dispatch[]
+  dispatchRuns DispatchRun[]
 
   @@unique([distributorId, code])
   @@index([distributorId, status])
@@ -307,9 +320,11 @@ model Staff {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  distributor        Distributor @relation(fields: [distributorId], references: [id], onDelete: Cascade)
-  driverDispatches   Dispatch[]  @relation("DispatchDriver")
-  salesmanDispatches Dispatch[]  @relation("DispatchSalesman")
+  distributor        Distributor   @relation(fields: [distributorId], references: [id], onDelete: Cascade)
+  driverDispatches   Dispatch[]    @relation("DispatchDriver")
+  salesmanDispatches Dispatch[]    @relation("DispatchSalesman")
+  driverRuns         DispatchRun[] @relation("DispatchRunDriver")
+  salesmanRuns       DispatchRun[] @relation("DispatchRunSalesman")
 
   @@unique([distributorId, employeeCode])
   @@index([distributorId, role, isActive])
@@ -342,6 +357,7 @@ model Dispatch {
   items          DispatchItem[]
   stops          DeliveryStop[]
   reconciliation DispatchReconciliation?
+  runs           DispatchRun[]
 
   @@unique([routeId, targetDate])
   @@index([distributorId, targetDate])
@@ -391,15 +407,18 @@ model DeliveryStop {
   createdAt                  DateTime           @default(now())
   updatedAt                  DateTime           @updatedAt
 
-  dispatch     Dispatch           @relation(fields: [dispatchId], references: [id], onDelete: Cascade)
-  demandSignal DemandSignal       @relation(fields: [demandSignalId], references: [id], onDelete: Cascade)
-  shop         Shop               @relation(fields: [shopId], references: [id], onDelete: Cascade)
-  items        DeliveryStopItem[]
+  dispatch      Dispatch           @relation(fields: [dispatchId], references: [id], onDelete: Cascade)
+  demandSignal  DemandSignal       @relation(fields: [demandSignalId], references: [id], onDelete: Cascade)
+  shop          Shop               @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  items         DeliveryStopItem[]
+  dispatchRunId String?
+  dispatchRun   DispatchRun?       @relation(fields: [dispatchRunId], references: [id], onDelete: SetNull)
 
   @@unique([dispatchId, demandSignalId])
   @@index([dispatchId, sequence])
   @@index([shopId])
   @@index([status])
+  @@index([dispatchRunId])
 }
 
 model DeliveryStopItem {
@@ -471,4 +490,76 @@ model DispatchReconciliationItem {
 
   @@unique([reconciliationId, productId])
   @@index([productId])
+}
+
+model DispatchRun {
+  id                 String            @id @default(cuid())
+  dispatchId         String
+  runNumber          Int
+  vehicleId          String?
+  driverId           String?
+  salesmanId         String?
+  status             DispatchRunStatus @default(DRAFT)
+  expectedValuePaise Int               @default(0)
+  plannedWeightGrams Int               @default(0)
+  plannedLoadPoints  Int               @default(0)
+  finalizedAt        DateTime?
+  dispatchedAt       DateTime?
+  completedAt        DateTime?
+  notes              String?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  dispatch        Dispatch          @relation(fields: [dispatchId], references: [id], onDelete: Cascade)
+  vehicle         Vehicle?          @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  driver          Staff?            @relation("DispatchRunDriver", fields: [driverId], references: [id], onDelete: SetNull)
+  salesman        Staff?            @relation("DispatchRunSalesman", fields: [salesmanId], references: [id], onDelete: SetNull)
+  items           DispatchRunItem[]
+  shopAssignments DispatchRunShop[]
+  deliveryStops   DeliveryStop[]
+
+  @@unique([dispatchId, runNumber])
+  @@index([vehicleId, status])
+  @@index([driverId, status])
+  @@index([salesmanId, status])
+  @@index([status])
+}
+
+model DispatchRunItem {
+  id                  String @id @default(cuid())
+  dispatchRunId       String
+  productId           String
+  confirmedQuantity   Int
+  reserveQuantity     Int    @default(0)
+  plannedQuantity     Int
+  unitWeightGrams     Int
+  unitLoadPoints      Int
+  plannedWeightGrams  Int
+  plannedLoadPoints   Int
+  confirmedValuePaise Int
+
+  dispatchRun DispatchRun @relation(fields: [dispatchRunId], references: [id], onDelete: Cascade)
+  product     Product     @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@unique([dispatchRunId, productId])
+  @@index([productId])
+}
+
+model DispatchRunShop {
+  id                 String   @id @default(cuid())
+  dispatchRunId      String
+  demandSignalId     String   @unique
+  shopId             String
+  sequence           Int
+  expectedValuePaise Int
+  plannedWeightGrams Int
+  plannedLoadPoints  Int
+  createdAt          DateTime @default(now())
+
+  dispatchRun  DispatchRun  @relation(fields: [dispatchRunId], references: [id], onDelete: Cascade)
+  demandSignal DemandSignal @relation(fields: [demandSignalId], references: [id], onDelete: Restrict)
+  shop         Shop         @relation(fields: [shopId], references: [id], onDelete: Restrict)
+
+  @@unique([dispatchRunId, sequence])
+  @@index([shopId])
 }

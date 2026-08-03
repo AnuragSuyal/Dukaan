@@ -11,7 +11,8 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:reset": "prisma migrate reset --force",
     "db:seed:operations": "tsx prisma/seed-operations.ts",
-    "db:backfill:delivery-stops": "tsx prisma/backfill-delivery-stops.ts"
+    "db:backfill:delivery-stops": "tsx prisma/backfill-delivery-stops.ts",
+    "db:backfill:dispatch-runs": "tsx prisma/backfill-dispatch-runs.ts"
   },
   "dependencies": {
     "@prisma/adapter-better-sqlite3": "^7.9.1",
