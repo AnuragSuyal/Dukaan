@@ -1,93 +1,8 @@
-﻿type Metric = {
-  label: string;
-  value: string;
-  change: string;
-  description: string;
-  accent: string;
-};
+import { getDashboardData } from "@/lib/dashboard";
 
-const metrics: Metric[] = [
-  {
-    label: "Tomorrow's predicted demand",
-    value: "₹1,84,320",
-    change: "+12.4%",
-    description: "Across 47 shops",
-    accent: "bg-emerald-500",
-  },
-  {
-    label: "Orders confirmed",
-    value: "31 / 47",
-    change: "66%",
-    description: "Before van loading",
-    accent: "bg-blue-500",
-  },
-  {
-    label: "Collection expected",
-    value: "₹47,300",
-    change: "8 due",
-    description: "Cash, UPI and credit",
-    accent: "bg-amber-500",
-  },
-  {
-    label: "Route readiness",
-    value: "82%",
-    change: "On track",
-    description: "3 issues need review",
-    accent: "bg-violet-500",
-  },
-];
+export const dynamic = "force-dynamic";
 
-const shops = [
-  {
-    shop: "Sharma General Store",
-    route: "Route 04",
-    prediction: "₹8,420",
-    status: "Confirmed",
-    products: "7 products",
-    time: "10:00–11:00",
-  },
-  {
-    shop: "Krishna Fast Food",
-    route: "Route 04",
-    prediction: "₹6,180",
-    status: "Modified",
-    products: "5 products",
-    time: "Before 12:00",
-  },
-  {
-    shop: "Gupta Provision Store",
-    route: "Route 04",
-    prediction: "₹11,260",
-    status: "Awaiting",
-    products: "9 products",
-    time: "11:30–13:00",
-  },
-  {
-    shop: "Ganga Bakery",
-    route: "Route 07",
-    prediction: "₹4,850",
-    status: "Confirmed",
-    products: "4 products",
-    time: "09:30–10:30",
-  },
-  {
-    shop: "Haridwar Juice Corner",
-    route: "Route 07",
-    prediction: "₹3,940",
-    status: "No response",
-    products: "6 products",
-    time: "After 13:00",
-  },
-];
-
-const vanLoad = [
-  { product: "Coke 750 ml", confirmed: 28, reserve: 3, unit: "crates", percent: 91 },
-  { product: "Water 1 litre", confirmed: 22, reserve: 4, unit: "cases", percent: 82 },
-  { product: "Chips ₹10", confirmed: 14, reserve: 2, unit: "cartons", percent: 74 },
-  { product: "Assorted biscuits", confirmed: 9, reserve: 2, unit: "cartons", percent: 58 },
-];
-
-const navItems = [
+const navigation = [
   ["Overview", "01"],
   ["Demand signals", "02"],
   ["Shop confirmations", "03"],
@@ -98,18 +13,47 @@ const navItems = [
   ["Reports", "08"],
 ];
 
+function formatMoney(paise: number): string {
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    maximumFractionDigits: 0,
+  }).format(paise / 100);
+}
+
+function formatDate(date: Date | null): string {
+  if (!date) {
+    return "No dispatch date";
+  }
+
+  return new Intl.DateTimeFormat("en-IN", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  }).format(date);
+}
+
 function StatusBadge({ status }: { status: string }) {
   const styles: Record<string, string> = {
-    Confirmed: "bg-emerald-50 text-emerald-700 ring-emerald-600/20",
-    Modified: "bg-blue-50 text-blue-700 ring-blue-600/20",
-    Awaiting: "bg-amber-50 text-amber-700 ring-amber-600/20",
-    "No response": "bg-slate-100 text-slate-600 ring-slate-500/20",
+    Confirmed:
+      "bg-emerald-50 text-emerald-700 ring-emerald-600/20",
+    Modified:
+      "bg-blue-50 text-blue-700 ring-blue-600/20",
+    Awaiting:
+      "bg-amber-50 text-amber-700 ring-amber-600/20",
+    "No response":
+      "bg-slate-100 text-slate-600 ring-slate-500/20",
+    Draft:
+      "bg-violet-50 text-violet-700 ring-violet-600/20",
+    Rejected:
+      "bg-red-50 text-red-700 ring-red-600/20",
   };
 
   return (
     <span
       className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ${
-        styles[status] ?? styles["No response"]
+        styles[status] ??
+        "bg-slate-100 text-slate-600 ring-slate-500/20"
       }`}
     >
       {status}
@@ -117,7 +61,40 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-export default function Home() {
+export default async function Home() {
+  const data = await getDashboardData();
+
+  const metrics = [
+    {
+      label: "Tomorrow's predicted demand",
+      value: formatMoney(data.totalSuggestedPaise),
+      change: `${data.totalSignals} shops`,
+      description: "Calculated from active demand signals",
+      accent: "bg-emerald-500",
+    },
+    {
+      label: "Orders confirmed",
+      value: `${data.confirmedSignals} / ${data.totalSignals}`,
+      change: `${data.routeReadiness}%`,
+      description: "Confirmed or modified by retailers",
+      accent: "bg-blue-500",
+    },
+    {
+      label: "Collection expected",
+      value: formatMoney(data.collectionExpectedPaise),
+      change: "Outstanding",
+      description: "Across shops with confirmed orders",
+      accent: "bg-amber-500",
+    },
+    {
+      label: "Route readiness",
+      value: `${data.routeReadiness}%`,
+      change: `${data.routesPrepared} routes`,
+      description: `${data.pendingSignals} signals still pending`,
+      accent: "bg-violet-500",
+    },
+  ];
+
   return (
     <div className="min-h-screen bg-[#f5f7fb] text-slate-950">
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 border-r border-slate-800 bg-[#101722] text-white lg:flex lg:flex-col">
@@ -125,14 +102,19 @@ export default function Home() {
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-400 font-black text-slate-950">
             DS
           </div>
+
           <div className="ml-3">
-            <p className="text-base font-bold tracking-tight">DukaanSignal</p>
-            <p className="text-xs text-slate-400">Distribution intelligence</p>
+            <p className="text-base font-bold tracking-tight">
+              DukaanSignal
+            </p>
+            <p className="text-xs text-slate-400">
+              Distribution intelligence
+            </p>
           </div>
         </div>
 
         <nav className="flex-1 space-y-1 px-3 py-6">
-          {navItems.map(([label, number], index) => (
+          {navigation.map(([label, number], index) => (
             <button
               key={label}
               className={`flex w-full items-center rounded-xl px-3 py-3 text-left text-sm transition ${
@@ -159,9 +141,11 @@ export default function Home() {
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-400">
             Pilot workspace
           </p>
-          <p className="mt-2 text-sm font-semibold">Haridwar Distribution Co.</p>
+          <p className="mt-2 text-sm font-semibold">
+            {data.distributorName}
+          </p>
           <p className="mt-1 text-xs leading-5 text-slate-400">
-            Mock data is active. Database connection comes next.
+            Live SQLite data is connected through Prisma.
           </p>
         </div>
       </aside>
@@ -173,12 +157,13 @@ export default function Home() {
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-950 font-black text-emerald-400 lg:hidden">
                 DS
               </div>
+
               <div>
                 <h1 className="text-lg font-bold tracking-tight sm:text-xl">
                   Distribution command centre
                 </h1>
                 <p className="hidden text-sm text-slate-500 sm:block">
-                  Predict, confirm, load and deliver before demand is missed.
+                  {formatDate(data.targetDate)} dispatch preparation
                 </p>
               </div>
             </div>
@@ -199,15 +184,17 @@ export default function Home() {
             <div className="grid gap-8 p-6 sm:p-8 xl:grid-cols-[1.4fr_0.8fr]">
               <div>
                 <div className="inline-flex rounded-full bg-emerald-400/10 px-3 py-1 text-xs font-semibold text-emerald-300 ring-1 ring-emerald-400/20">
-                  Tomorrow&apos;s dispatch intelligence
+                  Live dispatch intelligence
                 </div>
+
                 <h2 className="mt-5 max-w-2xl text-3xl font-black tracking-tight sm:text-4xl">
                   Know the order before the van leaves.
                 </h2>
+
                 <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-300 sm:text-base">
-                  DukaanSignal has identified 47 shops likely to require
-                  replenishment. Thirty-one have already confirmed or modified
-                  their suggested orders.
+                  DukaanSignal has generated {data.totalSignals} retailer
+                  demand signals. {data.confirmedSignals} shops have already
+                  confirmed or modified their suggested requirements.
                 </p>
 
                 <div className="mt-7 flex flex-wrap gap-3">
@@ -222,26 +209,36 @@ export default function Home() {
 
               <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-5">
                 <div className="flex items-center justify-between">
-                  <p className="text-sm font-semibold">Route preparation</p>
-                  <p className="text-sm font-bold text-emerald-300">82%</p>
+                  <p className="text-sm font-semibold">
+                    Route preparation
+                  </p>
+                  <p className="text-sm font-bold text-emerald-300">
+                    {data.routeReadiness}%
+                  </p>
                 </div>
+
                 <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-800">
-                  <div className="h-full w-[82%] rounded-full bg-emerald-400" />
+                  <div
+                    className="h-full rounded-full bg-emerald-400"
+                    style={{ width: `${data.routeReadiness}%` }}
+                  />
                 </div>
 
                 <div className="mt-6 grid grid-cols-2 gap-3">
                   {[
-                    ["47", "Shops analysed"],
-                    ["31", "Orders confirmed"],
-                    ["4", "Routes prepared"],
-                    ["3", "Issues pending"],
+                    [data.totalSignals, "Shops analysed"],
+                    [data.confirmedSignals, "Orders confirmed"],
+                    [data.routesPrepared, "Routes prepared"],
+                    [data.pendingSignals, "Signals pending"],
                   ].map(([value, label]) => (
                     <div
                       key={label}
                       className="rounded-xl border border-slate-800 bg-slate-950/50 p-3"
                     >
                       <p className="text-xl font-black">{value}</p>
-                      <p className="mt-1 text-xs text-slate-400">{label}</p>
+                      <p className="mt-1 text-xs text-slate-400">
+                        {label}
+                      </p>
                     </div>
                   ))}
                 </div>
@@ -255,10 +252,13 @@ export default function Home() {
                 key={metric.label}
                 className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
               >
-                <div className={`h-1.5 w-10 rounded-full ${metric.accent}`} />
+                <div
+                  className={`h-1.5 w-10 rounded-full ${metric.accent}`}
+                />
                 <p className="mt-5 text-sm font-medium text-slate-500">
                   {metric.label}
                 </p>
+
                 <div className="mt-2 flex items-end justify-between gap-3">
                   <p className="text-2xl font-black tracking-tight">
                     {metric.value}
@@ -267,6 +267,7 @@ export default function Home() {
                     {metric.change}
                   </span>
                 </div>
+
                 <p className="mt-2 text-xs text-slate-400">
                   {metric.description}
                 </p>
@@ -278,12 +279,15 @@ export default function Home() {
             <article className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
               <div className="flex items-center justify-between border-b border-slate-100 px-5 py-5 sm:px-6">
                 <div>
-                  <h3 className="font-bold">Shop confirmation queue</h3>
+                  <h3 className="font-bold">
+                    Shop confirmation queue
+                  </h3>
                   <p className="mt-1 text-sm text-slate-500">
-                    Suggested orders for tomorrow&apos;s routes
+                    Live demand signals from SQLite
                   </p>
                 </div>
-                <button className="text-sm font-semibold text-emerald-700 hover:text-emerald-800">
+
+                <button className="text-sm font-semibold text-emerald-700">
                   View all
                 </button>
               </div>
@@ -293,33 +297,48 @@ export default function Home() {
                   <thead>
                     <tr className="border-b border-slate-100 bg-slate-50/70 text-xs uppercase tracking-wide text-slate-400">
                       <th className="px-6 py-3 font-semibold">Shop</th>
-                      <th className="px-4 py-3 font-semibold">Suggested value</th>
-                      <th className="px-4 py-3 font-semibold">Products</th>
-                      <th className="px-4 py-3 font-semibold">Window</th>
-                      <th className="px-6 py-3 font-semibold">Status</th>
+                      <th className="px-4 py-3 font-semibold">
+                        Suggested value
+                      </th>
+                      <th className="px-4 py-3 font-semibold">
+                        Products
+                      </th>
+                      <th className="px-4 py-3 font-semibold">
+                        Window
+                      </th>
+                      <th className="px-6 py-3 font-semibold">
+                        Status
+                      </th>
                     </tr>
                   </thead>
+
                   <tbody>
-                    {shops.map((shop) => (
+                    {data.shops.map((shop) => (
                       <tr
                         key={shop.shop}
                         className="border-b border-slate-100 last:border-0 hover:bg-slate-50/70"
                       >
                         <td className="px-6 py-4">
-                          <p className="text-sm font-bold">{shop.shop}</p>
+                          <p className="text-sm font-bold">
+                            {shop.shop}
+                          </p>
                           <p className="mt-1 text-xs text-slate-400">
                             {shop.route}
                           </p>
                         </td>
+
                         <td className="px-4 py-4 text-sm font-semibold">
-                          {shop.prediction}
+                          {formatMoney(shop.predictionPaise)}
                         </td>
+
                         <td className="px-4 py-4 text-sm text-slate-600">
-                          {shop.products}
+                          {shop.products} products
                         </td>
+
                         <td className="px-4 py-4 text-sm text-slate-600">
                           {shop.time}
                         </td>
+
                         <td className="px-6 py-4">
                           <StatusBadge status={shop.status} />
                         </td>
@@ -333,31 +352,38 @@ export default function Home() {
             <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
               <div className="flex items-start justify-between">
                 <div>
-                  <h3 className="font-bold">Van 03 loading plan</h3>
+                  <h3 className="font-bold">
+                    Intelligent loading plan
+                  </h3>
                   <p className="mt-1 text-sm text-slate-500">
-                    Route 04 · departure 08:30
+                    {data.selectedRoute?.routeCode ?? "No route selected"}
                   </p>
                 </div>
+
                 <span className="rounded-lg bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700">
-                  91% capacity
+                  {data.vanLoadReadiness}% ready
                 </span>
               </div>
 
               <div className="mt-6 space-y-5">
-                {vanLoad.map((item) => (
+                {data.vanLoad.map((item) => (
                   <div key={item.product}>
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <p className="text-sm font-bold">{item.product}</p>
+                        <p className="text-sm font-bold">
+                          {item.product}
+                        </p>
                         <p className="mt-1 text-xs text-slate-400">
-                          {item.confirmed} confirmed + {item.reserve} reserve{" "}
-                          {item.unit}
+                          {item.confirmed} confirmed + {item.reserve}{" "}
+                          reserve {item.unit}
                         </p>
                       </div>
+
                       <p className="text-xs font-bold text-slate-500">
                         {item.percent}%
                       </p>
                     </div>
+
                     <div className="mt-2.5 h-2 overflow-hidden rounded-full bg-slate-100">
                       <div
                         className="h-full rounded-full bg-slate-900"
@@ -366,21 +392,13 @@ export default function Home() {
                     </div>
                   </div>
                 ))}
-              </div>
 
-              <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50 p-4">
-                <p className="text-sm font-bold text-amber-900">
-                  One stock issue detected
-                </p>
-                <p className="mt-1 text-xs leading-5 text-amber-700">
-                  Water 1 litre requires four additional reserve cases, but only
-                  two are currently available.
-                </p>
+                {data.vanLoad.length === 0 && (
+                  <p className="text-sm text-slate-500">
+                    No confirmed load is available yet.
+                  </p>
+                )}
               </div>
-
-              <button className="mt-5 w-full rounded-xl border border-slate-200 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">
-                Open complete loading sheet
-              </button>
             </article>
           </section>
 
@@ -389,35 +407,29 @@ export default function Home() {
               {
                 step: "01",
                 title: "Predict demand",
-                text: "Analyse each shop's reorder cycle, quantities and buying patterns.",
-                status: "47 signals ready",
+                text: `${data.totalSignals} shop-level suggestions generated from historical orders.`,
               },
               {
                 step: "02",
-                title: "Confirm on WhatsApp",
-                text: "Retailers confirm, modify or reject the suggested requirement.",
-                status: "31 responses",
+                title: "Confirm requirements",
+                text: `${data.confirmedSignals} retailers confirmed or modified their suggested quantities.`,
               },
               {
                 step: "03",
                 title: "Prepare dispatch",
-                text: "Combine orders into picking sheets, van loads and delivery routes.",
-                status: "4 routes prepared",
+                text: `${data.routesPrepared} delivery routes now contain confirmed commercial demand.`,
               },
             ].map((item) => (
               <article
                 key={item.step}
                 className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
               >
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-black tracking-[0.18em] text-emerald-600">
-                    STEP {item.step}
-                  </span>
-                  <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
-                    {item.status}
-                  </span>
-                </div>
-                <h3 className="mt-5 text-lg font-black">{item.title}</h3>
+                <span className="text-xs font-black tracking-[0.18em] text-emerald-600">
+                  STEP {item.step}
+                </span>
+                <h3 className="mt-5 text-lg font-black">
+                  {item.title}
+                </h3>
                 <p className="mt-2 text-sm leading-6 text-slate-500">
                   {item.text}
                 </p>
@@ -426,7 +438,8 @@ export default function Home() {
           </section>
 
           <footer className="py-8 text-center text-xs text-slate-400">
-            DukaanSignal pilot dashboard · UI foundation · Mock operational data
+            DukaanSignal pilot dashboard · Live Prisma data ·{" "}
+            {formatDate(data.targetDate)}
           </footer>
         </div>
       </main>
