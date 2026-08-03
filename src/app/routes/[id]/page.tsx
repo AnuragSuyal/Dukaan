@@ -112,6 +112,13 @@ export default async function RouteDetailPage({
                 </Link>
 
                 <Link
+                  href={`/routes/${data.route.id}/dispatch`}
+                  className="rounded-xl border border-emerald-400 px-4 py-3 text-sm font-bold text-emerald-300"
+                >
+                  Build dispatch
+                </Link>
+
+                <Link
                   href="/routes"
                   className="rounded-xl border border-slate-700 px-4 py-3 text-sm font-bold text-white"
                 >
