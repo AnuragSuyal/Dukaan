@@ -46,3 +46,4 @@ prisma/dev.db-wal
 
 /src/generated/prisma
 src/generated/prisma/
+prisma/backups/

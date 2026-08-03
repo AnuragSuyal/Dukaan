@@ -52,6 +52,28 @@ enum SignalStatus {
   NO_RESPONSE
 }
 
+enum VehicleStatus {
+  ACTIVE
+  MAINTENANCE
+  INACTIVE
+}
+
+enum StaffRole {
+  SALESMAN
+  DRIVER
+  WAREHOUSE
+  MANAGER
+}
+
+enum DispatchStatus {
+  DRAFT
+  LOADING
+  FINALIZED
+  DISPATCHED
+  COMPLETED
+  CANCELLED
+}
+
 model Distributor {
   id        String   @id @default(cuid())
   name      String
@@ -66,25 +88,31 @@ model Distributor {
   routes        Route[]
   orders        Order[]
   demandSignals DemandSignal[]
+  vehicles      Vehicle[]
+  staff         Staff[]
+  dispatches    Dispatch[]
 }
 
 model Product {
-  id             String   @id @default(cuid())
-  distributorId  String
-  sku            String
-  name           String
-  brand          String?
-  category       String?
-  packSize       String?
-  unit           String
-  unitPricePaise Int
-  isActive       Boolean  @default(true)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id              String   @id @default(cuid())
+  distributorId   String
+  sku             String
+  name            String
+  brand           String?
+  category        String?
+  packSize        String?
+  unit            String
+  unitPricePaise  Int
+  unitWeightGrams Int      @default(0)
+  unitLoadPoints  Int      @default(1)
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   distributor       Distributor        @relation(fields: [distributorId], references: [id], onDelete: Cascade)
   orderItems        OrderItem[]
   demandSignalItems DemandSignalItem[]
+  dispatchItems     DispatchItem[]
 
   @@unique([distributorId, sku])
   @@index([distributorId, isActive])
@@ -105,6 +133,7 @@ model Route {
   shops         Shop[]
   orders        Order[]
   demandSignals DemandSignal[]
+  dispatches    Dispatch[]
 
   @@unique([distributorId, code])
   @@index([distributorId, status])
@@ -226,5 +255,95 @@ model DemandSignalItem {
   product      Product      @relation(fields: [productId], references: [id], onDelete: Restrict)
 
   @@unique([demandSignalId, productId])
+  @@index([productId])
+}
+
+model Vehicle {
+  id                 String        @id @default(cuid())
+  distributorId      String
+  code               String
+  name               String
+  registrationNumber String?
+  maxWeightGrams     Int
+  maxLoadPoints      Int
+  status             VehicleStatus @default(ACTIVE)
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  distributor Distributor @relation(fields: [distributorId], references: [id], onDelete: Cascade)
+  dispatches  Dispatch[]
+
+  @@unique([distributorId, code])
+  @@index([distributorId, status])
+}
+
+model Staff {
+  id            String    @id @default(cuid())
+  distributorId String
+  employeeCode  String
+  name          String
+  phone         String?
+  role          StaffRole
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  distributor        Distributor @relation(fields: [distributorId], references: [id], onDelete: Cascade)
+  driverDispatches   Dispatch[]  @relation("DispatchDriver")
+  salesmanDispatches Dispatch[]  @relation("DispatchSalesman")
+
+  @@unique([distributorId, employeeCode])
+  @@index([distributorId, role, isActive])
+}
+
+model Dispatch {
+  id                  String         @id @default(cuid())
+  distributorId       String
+  routeId             String
+  vehicleId           String?
+  driverId            String?
+  salesmanId          String?
+  targetDate          DateTime
+  status              DispatchStatus @default(DRAFT)
+  confirmedValuePaise Int            @default(0)
+  plannedWeightGrams  Int            @default(0)
+  plannedLoadPoints   Int            @default(0)
+  finalizedAt         DateTime?
+  dispatchedAt        DateTime?
+  completedAt         DateTime?
+  notes               String?
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+
+  distributor Distributor    @relation(fields: [distributorId], references: [id], onDelete: Cascade)
+  route       Route          @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  vehicle     Vehicle?       @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  driver      Staff?         @relation("DispatchDriver", fields: [driverId], references: [id], onDelete: SetNull)
+  salesman    Staff?         @relation("DispatchSalesman", fields: [salesmanId], references: [id], onDelete: SetNull)
+  items       DispatchItem[]
+
+  @@unique([routeId, targetDate])
+  @@index([distributorId, targetDate])
+  @@index([vehicleId, targetDate])
+  @@index([status])
+}
+
+model DispatchItem {
+  id                  String @id @default(cuid())
+  dispatchId          String
+  productId           String
+  confirmedQuantity   Int
+  reserveQuantity     Int
+  plannedQuantity     Int
+  unitWeightGrams     Int
+  unitLoadPoints      Int
+  plannedWeightGrams  Int
+  plannedLoadPoints   Int
+  confirmedValuePaise Int
+
+  dispatch Dispatch @relation(fields: [dispatchId], references: [id], onDelete: Cascade)
+  product  Product  @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@unique([dispatchId, productId])
   @@index([productId])
 }
