@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { buildDispatchSplitPreview } from "@/lib/dispatch-split";
+import { persistSplitPlan } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -70,9 +71,35 @@ export default async function SplitPreviewPage({
             </div>
           </div>
 
-          <span className="rounded-full bg-blue-50 px-3 py-1.5 text-xs font-black text-blue-700">
-            Preview only
-          </span>
+          <div className="flex items-center gap-3">
+            <span className="rounded-full bg-blue-50 px-3 py-1.5 text-xs font-black text-blue-700">
+              Preview only
+            </span>
+
+            {hasPlan &&
+              preview.dispatch.currentStatus === "DRAFT" && (
+                <form action={persistSplitPlan}>
+                  <input
+                    type="hidden"
+                    name="routeId"
+                    value={id}
+                  />
+
+                  <input
+                    type="hidden"
+                    name="dispatchId"
+                    value={preview.dispatch.id}
+                  />
+
+                  <button
+                    type="submit"
+                    className="rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-black text-white"
+                  >
+                    Create vehicle runs
+                  </button>
+                </form>
+              )}
+          </div>
         </div>
       </header>
 
