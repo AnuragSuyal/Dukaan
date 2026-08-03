@@ -8,16 +8,48 @@ type DriverDispatchPageProps = {
   params: Promise<{
     id: string;
   }>;
+  searchParams: Promise<{
+    success?: string | string[];
+    error?: string | string[];
+  }>;
 };
 
-const statusLabels: Record<string, string> = {
-  DRAFT: "Draft",
-  LOADING: "Warehouse loading",
+const dispatchStatusLabels: Record<string, string> = {
   FINALIZED: "Ready for departure",
   DISPATCHED: "Route active",
-  COMPLETED: "Completed",
-  CANCELLED: "Cancelled",
+  COMPLETED: "Route completed",
 };
+
+const stopStatusLabels: Record<string, string> = {
+  PENDING: "Pending",
+  ARRIVED: "At shop",
+  DELIVERED: "Delivered",
+  PARTIAL: "Partial",
+  FAILED: "Failed",
+  SKIPPED: "Skipped",
+};
+
+const stopStatusStyles: Record<string, string> = {
+  PENDING: "bg-slate-100 text-slate-600",
+  ARRIVED: "bg-blue-50 text-blue-700",
+  DELIVERED: "bg-emerald-50 text-emerald-700",
+  PARTIAL: "bg-amber-50 text-amber-700",
+  FAILED: "bg-red-50 text-red-700",
+  SKIPPED: "bg-violet-50 text-violet-700",
+};
+
+const terminalStatuses = new Set([
+  "DELIVERED",
+  "PARTIAL",
+  "FAILED",
+  "SKIPPED",
+]);
+
+function firstValue(
+  value: string | string[] | undefined,
+): string {
+  return Array.isArray(value) ? value[0] ?? "" : value ?? "";
+}
 
 function formatMoney(paise: number): string {
   return new Intl.NumberFormat("en-IN", {
@@ -54,8 +86,10 @@ function formatTime(date: Date | null): string {
 
 export default async function DriverDispatchPage({
   params,
+  searchParams,
 }: DriverDispatchPageProps) {
   const { id } = await params;
+  const query = await searchParams;
 
   const dispatch = await prisma.dispatch.findUnique({
     where: {
@@ -74,6 +108,15 @@ export default async function DriverDispatchPage({
           plannedLoadPoints: "desc",
         },
       },
+      stops: {
+        include: {
+          shop: true,
+          items: true,
+        },
+        orderBy: {
+          sequence: "asc",
+        },
+      },
     },
   });
 
@@ -81,63 +124,42 @@ export default async function DriverDispatchPage({
     notFound();
   }
 
-  const signals = await prisma.demandSignal.findMany({
-    where: {
-      routeId: dispatch.routeId,
-      targetDate: dispatch.targetDate,
-      status: {
-        in: ["CONFIRMED", "MODIFIED"],
-      },
-    },
-    include: {
-      shop: true,
-      items: true,
-    },
-  });
+  const success = firstValue(query.success);
+  const error = firstValue(query.error);
 
-  signals.sort(
-    (first, second) =>
-      (first.shop.preferredWindow ?? "").localeCompare(
-        second.shop.preferredWindow ?? "",
-      ) ||
-      first.shop.name.localeCompare(second.shop.name),
-  );
+  const completedStops = dispatch.stops.filter((stop) =>
+    terminalStatuses.has(stop.status),
+  ).length;
 
-  const stops = signals.map((signal, index) => {
-    const expectedValuePaise = signal.items.reduce(
-      (total, item) =>
-        total +
-        item.unitPricePaise *
-          (item.confirmedQuantity ?? item.suggestedQuantity),
-      0,
-    );
+  const deliveredStops = dispatch.stops.filter(
+    (stop) => stop.status === "DELIVERED",
+  ).length;
 
-    const location = [
-      signal.shop.address,
-      signal.shop.locality,
-      "Haridwar",
-    ]
-      .filter(Boolean)
-      .join(", ");
+  const partialStops = dispatch.stops.filter(
+    (stop) => stop.status === "PARTIAL",
+  ).length;
 
-    return {
-      sequence: index + 1,
-      signalId: signal.id,
-      shop: signal.shop,
-      expectedValuePaise,
-      productCount: signal.items.length,
-      mapsUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-        location,
-      )}`,
-    };
-  });
+  const progress =
+    dispatch.stops.length === 0
+      ? 0
+      : Math.round(
+          (completedStops / dispatch.stops.length) * 100,
+        );
 
-  const totalExpectedValuePaise = stops.reduce(
+  const totalExpectedValuePaise = dispatch.stops.reduce(
     (total, stop) => total + stop.expectedValuePaise,
     0,
   );
 
-  const totalOutstandingPaise = stops.reduce(
+  const totalCollectedPaise = dispatch.stops.reduce(
+    (total, stop) =>
+      total +
+      stop.currentOrderCollectedPaise +
+      stop.outstandingCollectedPaise,
+    0,
+  );
+
+  const totalOutstandingPaise = dispatch.stops.reduce(
     (total, stop) => total + stop.shop.outstandingPaise,
     0,
   );
@@ -152,7 +174,8 @@ export default async function DriverDispatchPage({
             </div>
 
             <span className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-bold text-emerald-300">
-              {statusLabels[dispatch.status] ?? dispatch.status}
+              {dispatchStatusLabels[dispatch.status] ??
+                dispatch.status}
             </span>
           </div>
 
@@ -197,22 +220,59 @@ export default async function DriverDispatchPage({
               </p>
             </div>
           </div>
+
+          <div className="mt-6">
+            <div className="flex items-center justify-between text-xs">
+              <span className="font-bold">
+                Route progress
+              </span>
+              <span className="font-black text-emerald-300">
+                {completedStops}/{dispatch.stops.length} · {progress}%
+              </span>
+            </div>
+
+            <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-800">
+              <div
+                className="h-full rounded-full bg-emerald-400"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+          </div>
         </div>
       </header>
 
       <div className="mx-auto max-w-lg px-4">
-        <section className="-mt-4 grid grid-cols-2 gap-3">
+        {success && (
+          <div className="-mt-4 mb-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-bold text-emerald-800">
+            {success}
+          </div>
+        )}
+
+        {error && (
+          <div className="-mt-4 mb-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-bold text-red-800">
+            {error}
+          </div>
+        )}
+
+        <section className={`${success || error ? "" : "-mt-4"} grid grid-cols-2 gap-3`}>
           <article className="rounded-2xl bg-white p-4 shadow-sm">
-            <p className="text-xs text-slate-400">Route stops</p>
+            <p className="text-xs text-slate-400">Completed stops</p>
             <p className="mt-1 text-2xl font-black">
-              {stops.length}
+              {completedStops}/{dispatch.stops.length}
             </p>
           </article>
 
           <article className="rounded-2xl bg-white p-4 shadow-sm">
-            <p className="text-xs text-slate-400">Expected sales</p>
+            <p className="text-xs text-slate-400">Collected</p>
             <p className="mt-1 text-lg font-black">
-              {formatMoney(totalExpectedValuePaise)}
+              {formatMoney(totalCollectedPaise)}
+            </p>
+          </article>
+
+          <article className="rounded-2xl bg-white p-4 shadow-sm">
+            <p className="text-xs text-slate-400">Delivered / partial</p>
+            <p className="mt-1 text-lg font-black">
+              {deliveredStops} / {partialStops}
             </p>
           </article>
 
@@ -222,13 +282,24 @@ export default async function DriverDispatchPage({
               {formatWeight(dispatch.plannedWeightGrams)}
             </p>
           </article>
+        </section>
 
-          <article className="rounded-2xl bg-white p-4 shadow-sm">
-            <p className="text-xs text-slate-400">Old outstanding</p>
+        <section className="mt-5 grid grid-cols-2 gap-3">
+          <div className="rounded-2xl bg-white p-4 shadow-sm">
+            <p className="text-xs text-slate-400">Expected sales</p>
+            <p className="mt-1 text-lg font-black">
+              {formatMoney(totalExpectedValuePaise)}
+            </p>
+          </div>
+
+          <div className="rounded-2xl bg-white p-4 shadow-sm">
+            <p className="text-xs text-slate-400">
+              Current outstanding
+            </p>
             <p className="mt-1 text-lg font-black">
               {formatMoney(totalOutstandingPaise)}
             </p>
-          </article>
+          </div>
         </section>
 
         {dispatch.notes && (
@@ -254,79 +325,111 @@ export default async function DriverDispatchPage({
             </div>
 
             <p className="text-sm font-bold text-slate-500">
-              {stops.length} stops
+              {dispatch.stops.length} stops
             </p>
           </div>
 
           <div className="mt-4 space-y-3">
-            {stops.map((stop) => (
-              <article
-                key={stop.signalId}
-                className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
-              >
-                <div className="flex items-start gap-3">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-950 text-sm font-black text-emerald-400">
-                    {stop.sequence}
-                  </div>
+            {dispatch.stops.map((stop) => {
+              const location = [
+                stop.shop.address,
+                stop.shop.locality,
+                "Haridwar",
+              ]
+                .filter(Boolean)
+                .join(", ");
 
-                  <div className="min-w-0 flex-1">
-                    <h3 className="font-black">{stop.shop.name}</h3>
+              const mapsUrl =
+                `https://www.google.com/maps/search/?api=1&query=` +
+                encodeURIComponent(location);
 
-                    <p className="mt-1 text-xs text-slate-500">
-                      {stop.shop.ownerName ?? "Owner not recorded"} ·{" "}
-                      {stop.shop.locality ?? "No locality"}
-                    </p>
-                  </div>
+              const closed = terminalStatuses.has(stop.status);
 
-                  <p className="text-sm font-black">
-                    {formatMoney(stop.expectedValuePaise)}
-                  </p>
-                </div>
-
-                <div className="mt-4 grid grid-cols-2 gap-3">
-                  <div className="rounded-xl bg-slate-50 p-3">
-                    <p className="text-xs text-slate-400">
-                      Delivery window
-                    </p>
-                    <p className="mt-1 text-sm font-black">
-                      {stop.shop.preferredWindow ?? "Not specified"}
-                    </p>
-                  </div>
-
-                  <div className="rounded-xl bg-slate-50 p-3">
-                    <p className="text-xs text-slate-400">Products</p>
-                    <p className="mt-1 text-sm font-black">
-                      {stop.productCount}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="mt-4 grid grid-cols-2 gap-3">
-                  <a
-                    href={`tel:${stop.shop.phone}`}
-                    className="flex min-h-11 items-center justify-center rounded-xl border border-slate-200 text-sm font-black text-slate-700"
-                  >
-                    Call shop
-                  </a>
-
-                  <a
-                    href={stop.mapsUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex min-h-11 items-center justify-center rounded-xl bg-emerald-400 text-sm font-black text-slate-950"
-                  >
-                    Navigate
-                  </a>
-                </div>
-
-                <Link
-                  href={`/signals/${stop.signalId}`}
-                  className="mt-3 flex min-h-11 items-center justify-center rounded-xl bg-slate-950 text-sm font-black text-white"
+              return (
+                <article
+                  key={stop.id}
+                  className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
                 >
-                  View order details
-                </Link>
-              </article>
-            ))}
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-950 text-sm font-black text-emerald-400">
+                      {stop.sequence}
+                    </div>
+
+                    <div className="min-w-0 flex-1">
+                      <h3 className="font-black">{stop.shop.name}</h3>
+                      <p className="mt-1 text-xs text-slate-500">
+                        {stop.shop.ownerName ?? "Owner not recorded"} ·{" "}
+                        {stop.shop.locality ?? "No locality"}
+                      </p>
+                    </div>
+
+                    <span
+                      className={`rounded-full px-2.5 py-1 text-[11px] font-black ${
+                        stopStatusStyles[stop.status] ??
+                        "bg-slate-100 text-slate-600"
+                      }`}
+                    >
+                      {stopStatusLabels[stop.status] ?? stop.status}
+                    </span>
+                  </div>
+
+                  <div className="mt-4 grid grid-cols-2 gap-3">
+                    <div className="rounded-xl bg-slate-50 p-3">
+                      <p className="text-xs text-slate-400">
+                        Expected value
+                      </p>
+                      <p className="mt-1 text-sm font-black">
+                        {formatMoney(stop.expectedValuePaise)}
+                      </p>
+                    </div>
+
+                    <div className="rounded-xl bg-slate-50 p-3">
+                      <p className="text-xs text-slate-400">
+                        Delivery window
+                      </p>
+                      <p className="mt-1 text-sm font-black">
+                        {stop.shop.preferredWindow ?? "Not specified"}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 grid grid-cols-2 gap-3">
+                    <a
+                      href={`tel:${stop.shop.phone}`}
+                      className="flex min-h-11 items-center justify-center rounded-xl border border-slate-200 text-sm font-black text-slate-700"
+                    >
+                      Call
+                    </a>
+
+                    <a
+                      href={mapsUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex min-h-11 items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50 text-sm font-black text-emerald-800"
+                    >
+                      Navigate
+                    </a>
+                  </div>
+
+                  <Link
+                    href={`/driver/dispatch/${dispatch.id}/stop/${stop.id}`}
+                    className={`mt-3 flex min-h-12 items-center justify-center rounded-xl text-sm font-black ${
+                      closed
+                        ? "bg-slate-100 text-slate-700"
+                        : stop.status === "ARRIVED"
+                          ? "bg-blue-600 text-white"
+                          : "bg-slate-950 text-white"
+                    }`}
+                  >
+                    {closed
+                      ? "View completed record"
+                      : stop.status === "ARRIVED"
+                        ? "Complete delivery"
+                        : "Open delivery stop"}
+                  </Link>
+                </article>
+              );
+            })}
           </div>
         </section>
 
