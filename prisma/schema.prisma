@@ -1,0 +1,230 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+enum ShopStatus {
+  ACTIVE
+  PAUSED
+  CLOSED
+}
+
+enum RouteStatus {
+  ACTIVE
+  PAUSED
+}
+
+enum OrderSource {
+  HISTORICAL
+  RETAILER
+  SALESMAN
+  DEMAND_SIGNAL
+}
+
+enum OrderStatus {
+  DRAFT
+  CONFIRMED
+  LOADED
+  DISPATCHED
+  DELIVERED
+  CANCELLED
+}
+
+enum PaymentMethod {
+  CASH
+  UPI
+  CREDIT
+  BANK_TRANSFER
+  MIXED
+}
+
+enum SignalStatus {
+  DRAFT
+  SENT
+  CONFIRMED
+  MODIFIED
+  REJECTED
+  EXPIRED
+  NO_RESPONSE
+}
+
+model Distributor {
+  id        String   @id @default(cuid())
+  name      String
+  phone     String?
+  city      String?
+  state     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  products      Product[]
+  shops         Shop[]
+  routes        Route[]
+  orders        Order[]
+  demandSignals DemandSignal[]
+}
+
+model Product {
+  id             String   @id @default(cuid())
+  distributorId  String
+  sku            String
+  name           String
+  brand          String?
+  category       String?
+  packSize       String?
+  unit           String
+  unitPricePaise Int
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  distributor       Distributor        @relation(fields: [distributorId], references: [id], onDelete: Cascade)
+  orderItems        OrderItem[]
+  demandSignalItems DemandSignalItem[]
+
+  @@unique([distributorId, sku])
+  @@index([distributorId, isActive])
+  @@index([name])
+}
+
+model Route {
+  id            String      @id @default(cuid())
+  distributorId String
+  code          String
+  name          String
+  deliveryDays  String?
+  status        RouteStatus @default(ACTIVE)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  distributor   Distributor    @relation(fields: [distributorId], references: [id], onDelete: Cascade)
+  shops         Shop[]
+  orders        Order[]
+  demandSignals DemandSignal[]
+
+  @@unique([distributorId, code])
+  @@index([distributorId, status])
+}
+
+model Shop {
+  id               String     @id @default(cuid())
+  distributorId    String
+  routeId          String?
+  name             String
+  ownerName        String?
+  phone            String
+  address          String?
+  locality         String?
+  latitude         Float?
+  longitude        Float?
+  preferredWindow  String?
+  creditLimitPaise Int        @default(0)
+  outstandingPaise Int        @default(0)
+  status           ShopStatus @default(ACTIVE)
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+
+  distributor   Distributor    @relation(fields: [distributorId], references: [id], onDelete: Cascade)
+  route         Route?         @relation(fields: [routeId], references: [id], onDelete: SetNull)
+  orders        Order[]
+  demandSignals DemandSignal[]
+
+  @@unique([distributorId, phone])
+  @@index([distributorId, status])
+  @@index([routeId])
+}
+
+model Order {
+  id            String         @id @default(cuid())
+  distributorId String
+  shopId        String
+  routeId       String?
+  invoiceNumber String?
+  source        OrderSource    @default(HISTORICAL)
+  status        OrderStatus    @default(DRAFT)
+  orderDate     DateTime
+  deliveryDate  DateTime?
+  confirmedAt   DateTime?
+  dispatchedAt  DateTime?
+  deliveredAt   DateTime?
+  totalPaise    Int            @default(0)
+  paymentMethod PaymentMethod?
+  notes         String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  distributor Distributor @relation(fields: [distributorId], references: [id], onDelete: Cascade)
+  shop        Shop        @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  route       Route?      @relation(fields: [routeId], references: [id], onDelete: SetNull)
+  items       OrderItem[]
+
+  @@index([distributorId, orderDate])
+  @@index([shopId, orderDate])
+  @@index([routeId, deliveryDate])
+  @@index([status])
+}
+
+model OrderItem {
+  id             String @id @default(cuid())
+  orderId        String
+  productId      String
+  quantity       Int
+  unitPricePaise Int
+  lineTotalPaise Int
+
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@unique([orderId, productId])
+  @@index([productId])
+}
+
+model DemandSignal {
+  id                  String       @id @default(cuid())
+  distributorId       String
+  shopId              String
+  routeId             String?
+  targetDate          DateTime
+  status              SignalStatus @default(DRAFT)
+  averageConfidence   Int
+  totalSuggestedPaise Int          @default(0)
+  confirmationToken   String       @unique @default(cuid())
+  sentAt              DateTime?
+  confirmedAt         DateTime?
+  expiresAt           DateTime?
+  merchantNote        String?
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+
+  distributor Distributor        @relation(fields: [distributorId], references: [id], onDelete: Cascade)
+  shop        Shop               @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  route       Route?             @relation(fields: [routeId], references: [id], onDelete: SetNull)
+  items       DemandSignalItem[]
+
+  @@index([distributorId, targetDate])
+  @@index([shopId, targetDate])
+  @@index([routeId, targetDate])
+  @@index([status])
+}
+
+model DemandSignalItem {
+  id                  String @id @default(cuid())
+  demandSignalId      String
+  productId           String
+  suggestedQuantity   Int
+  confirmedQuantity   Int?
+  confidence          Int
+  reason              String
+  unitPricePaise      Int
+  suggestedTotalPaise Int
+
+  demandSignal DemandSignal @relation(fields: [demandSignalId], references: [id], onDelete: Cascade)
+  product      Product      @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@unique([demandSignalId, productId])
+  @@index([productId])
+}
