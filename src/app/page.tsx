@@ -198,9 +198,12 @@ export default async function Home() {
                 </p>
 
                 <div className="mt-7 flex flex-wrap gap-3">
-                  <button className="rounded-xl bg-emerald-400 px-4 py-2.5 text-sm font-bold text-slate-950 hover:bg-emerald-300">
+                  <a
+                    href="/signals"
+                    className="rounded-xl bg-emerald-400 px-4 py-2.5 text-sm font-bold text-slate-950 hover:bg-emerald-300"
+                  >
                     Review demand signals
-                  </button>
+                  </a>
                   <button className="rounded-xl border border-slate-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800">
                     Open confirmation queue
                   </button>
@@ -287,9 +290,12 @@ export default async function Home() {
                   </p>
                 </div>
 
-                <button className="text-sm font-semibold text-emerald-700">
+                <a
+                  href="/signals"
+                  className="text-sm font-semibold text-emerald-700"
+                >
                   View all
-                </button>
+                </a>
               </div>
 
               <div className="overflow-x-auto">
@@ -438,7 +444,7 @@ export default async function Home() {
           </section>
 
           <footer className="py-8 text-center text-xs text-slate-400">
-            DukaanSignal pilot dashboard · Live Prisma data ·{" "}
+            DukaanSignal pilot dashboard Â· Live Prisma data Â·{" "}
             {formatDate(data.targetDate)}
           </footer>
         </div>
