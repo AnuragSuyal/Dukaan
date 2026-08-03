@@ -5,13 +5,6 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 
 const activeStatuses = ["PENDING", "ARRIVED"] as const;
-const terminalStatuses = [
-  "DELIVERED",
-  "PARTIAL",
-  "FAILED",
-  "SKIPPED",
-] as const;
-
 const paymentMethods = [
   "CASH",
   "UPI",

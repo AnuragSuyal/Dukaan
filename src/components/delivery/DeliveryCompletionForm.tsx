@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
 type DeliveryItem = {
   id: string;
@@ -73,10 +73,12 @@ export default function DeliveryCompletionForm({
   );
 
   const [paymentMethod, setPaymentMethod] = useState("CASH");
-  const [currentCollected, setCurrentCollected] = useState(
-    rupeesInputValue(expectedValuePaise),
-  );
-  const [creditExtended, setCreditExtended] = useState("0.00");
+
+  const [mixedCurrentCollected, setMixedCurrentCollected] =
+    useState(rupeesInputValue(expectedValuePaise));
+
+  const [mixedCreditExtended, setMixedCreditExtended] =
+    useState("0.00");
 
   const deliveredValuePaise = useMemo(
     () =>
@@ -118,18 +120,30 @@ export default function DeliveryCompletionForm({
     [itemState],
   );
 
-  useEffect(() => {
-    if (paymentMethod === "CREDIT") {
-      setCurrentCollected("0.00");
-      setCreditExtended(rupeesInputValue(deliveredValuePaise));
-      return;
-    }
+  const currentCollected =
+    paymentMethod === "CREDIT"
+      ? "0.00"
+      : paymentMethod === "MIXED"
+        ? mixedCurrentCollected
+        : rupeesInputValue(deliveredValuePaise);
 
-    if (paymentMethod !== "MIXED") {
-      setCurrentCollected(rupeesInputValue(deliveredValuePaise));
-      setCreditExtended("0.00");
+  const creditExtended =
+    paymentMethod === "CREDIT"
+      ? rupeesInputValue(deliveredValuePaise)
+      : paymentMethod === "MIXED"
+        ? mixedCreditExtended
+        : "0.00";
+
+  function handlePaymentMethodChange(nextMethod: string) {
+    setPaymentMethod(nextMethod);
+
+    if (nextMethod === "MIXED") {
+      setMixedCurrentCollected(
+        rupeesInputValue(deliveredValuePaise),
+      );
+      setMixedCreditExtended("0.00");
     }
-  }, [deliveredValuePaise, paymentMethod]);
+  }
 
   function updateDelivered(item: DeliveryItem, value: number) {
     setItemState((current) => {
@@ -350,9 +364,7 @@ export default function DeliveryCompletionForm({
           <select
             name="paymentMethod"
             value={paymentMethod}
-            onChange={(event) =>
-              setPaymentMethod(event.target.value)
-            }
+            onChange={(event) => handlePaymentMethodChange(event.target.value)}
             className="mt-2 w-full rounded-xl border border-slate-200 bg-white p-3 text-sm"
           >
             {paymentMethods.map(([value, label]) => (
@@ -376,9 +388,9 @@ export default function DeliveryCompletionForm({
               name="currentOrderCollectedRupees"
               value={currentCollected}
               onChange={(event) =>
-                setCurrentCollected(event.target.value)
+                setMixedCurrentCollected(event.target.value)
               }
-              readOnly={paymentMethod === "CREDIT"}
+              readOnly={paymentMethod !== "MIXED"}
               className="mt-1.5 w-full rounded-xl border border-slate-200 p-3 font-black"
             />
           </label>
@@ -395,7 +407,7 @@ export default function DeliveryCompletionForm({
               name="creditExtendedRupees"
               value={creditExtended}
               onChange={(event) =>
-                setCreditExtended(event.target.value)
+                setMixedCreditExtended(event.target.value)
               }
               readOnly={paymentMethod !== "MIXED"}
               className="mt-1.5 w-full rounded-xl border border-slate-200 p-3 font-black"
