@@ -445,7 +445,7 @@ export default async function Home() {
           </section>
 
           <footer className="py-8 text-center text-xs text-slate-400">
-            DukaanSignal pilot dashboard Ã‚Â· Live Prisma data Ã‚Â·{" "}
+            DukaanSignal pilot dashboard Ã‚· Live Prisma data Ã‚·{" "}
             {formatDate(data.targetDate)}
           </footer>
         </div>

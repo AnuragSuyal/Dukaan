@@ -333,7 +333,7 @@ export default async function SignalsPage({
                       : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                   }`}
                 >
-                  {statusLabels[status]} Â· {count}
+                  {statusLabels[status]} · {count}
                 </Link>
               );
             })}
@@ -364,7 +364,7 @@ export default async function SignalsPage({
                     </Link>
 
                     <p className="mt-1 text-xs text-slate-400">
-                      {signal.shop.route?.code ?? "Unassigned"} Â·{" "}
+                      {signal.shop.route?.code ?? "Unassigned"} ·{" "}
                       {signal.shop.locality ?? "No locality"}
                     </p>
                   </div>
@@ -465,7 +465,7 @@ export default async function SignalsPage({
                         {signal.shop.name}
                       </Link>
                       <p className="mt-1 text-xs text-slate-400">
-                        {signal.shop.route?.code ?? "Unassigned"} Â·{" "}
+                        {signal.shop.route?.code ?? "Unassigned"} ·{" "}
                         {signal.shop.locality ?? "No locality"}
                       </p>
                     </td>
