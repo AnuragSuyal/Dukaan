@@ -618,3 +618,100 @@ export async function optimizeDispatchForVehicle(
         } removed. The dispatch now safely fits ${vehicle.code}.`,
   );
 }
+export async function markVehicleDeparted(
+  formData: FormData,
+): Promise<void> {
+  const routeId = requiredText(formData, "routeId");
+  const dispatchId = requiredText(formData, "dispatchId");
+
+  const dispatch = await prisma.dispatch.findUnique({
+    where: {
+      id: dispatchId,
+    },
+    include: {
+      vehicle: true,
+      driver: true,
+      salesman: true,
+      items: true,
+    },
+  });
+
+  if (!dispatch || dispatch.routeId !== routeId) {
+    goToWorkspace(
+      routeId,
+      "error",
+      "The selected dispatch could not be found.",
+    );
+  }
+
+  if (dispatch.status !== "FINALIZED") {
+    goToWorkspace(
+      routeId,
+      "error",
+      "Only a finalized dispatch can leave the warehouse.",
+    );
+  }
+
+  if (!dispatch.vehicle || !dispatch.driver || !dispatch.salesman) {
+    goToWorkspace(
+      routeId,
+      "error",
+      "Vehicle, driver and salesperson assignments are required.",
+    );
+  }
+
+  if (dispatch.items.length === 0) {
+    goToWorkspace(
+      routeId,
+      "error",
+      "The dispatch manifest contains no products.",
+    );
+  }
+
+  const actualWeightGrams = dispatch.items.reduce(
+    (total, item) => total + item.plannedWeightGrams,
+    0,
+  );
+
+  const actualLoadPoints = dispatch.items.reduce(
+    (total, item) => total + item.plannedLoadPoints,
+    0,
+  );
+
+  if (actualWeightGrams > dispatch.vehicle.maxWeightGrams) {
+    goToWorkspace(
+      routeId,
+      "error",
+      "Departure blocked because the vehicle is overweight.",
+    );
+  }
+
+  if (actualLoadPoints > dispatch.vehicle.maxLoadPoints) {
+    goToWorkspace(
+      routeId,
+      "error",
+      "Departure blocked because the vehicle exceeds its space limit.",
+    );
+  }
+
+  await prisma.dispatch.update({
+    where: {
+      id: dispatch.id,
+    },
+    data: {
+      status: "DISPATCHED",
+      dispatchedAt: new Date(),
+      plannedWeightGrams: actualWeightGrams,
+      plannedLoadPoints: actualLoadPoints,
+    },
+  });
+
+  revalidatePath(`/routes/${routeId}/dispatch`);
+  revalidatePath(`/driver/dispatch/${dispatch.id}`);
+
+  goToWorkspace(
+    routeId,
+    "success",
+    "Vehicle departure recorded. The driver route is now active.",
+  );
+}

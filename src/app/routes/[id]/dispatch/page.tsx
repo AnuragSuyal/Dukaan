@@ -5,6 +5,7 @@ import { getDispatchWorkspace } from "@/lib/dispatches";
 import {
   createOrRefreshDispatch,
   finalizeDispatch,
+  markVehicleDeparted,
   optimizeDispatchForVehicle,
   startDispatchLoading,
   updateDispatchAssignment,
@@ -527,6 +528,43 @@ export default async function DispatchPage({
                     </button>
                   </form>
                 </div>
+
+                {dispatch.status === "FINALIZED" && (
+                  <form
+                    action={markVehicleDeparted}
+                    className="mt-4"
+                  >
+                    <input
+                      type="hidden"
+                      name="routeId"
+                      value={route.id}
+                    />
+                    <input
+                      type="hidden"
+                      name="dispatchId"
+                      value={dispatch.id}
+                    />
+
+                    <button
+                      type="submit"
+                      className="w-full rounded-xl bg-blue-600 py-3.5 text-sm font-black text-white hover:bg-blue-700"
+                    >
+                      Mark vehicle departed
+                    </button>
+                  </form>
+                )}
+
+                {["FINALIZED", "DISPATCHED", "COMPLETED"].includes(
+                  dispatch.status,
+                ) && (
+                  <Link
+                    href={`/driver/dispatch/${dispatch.id}`}
+                    target="_blank"
+                    className="mt-3 flex w-full items-center justify-center rounded-xl border border-slate-200 bg-white py-3 text-sm font-black text-slate-800 hover:bg-slate-50"
+                  >
+                    Open mobile driver view
+                  </Link>
+                )}
               </article>
             )}
           </div>
