@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { buildCurrentDispatchPlan } from "@/lib/dispatches";
+import { ensureDeliveryStopsForDispatch } from "@/lib/delivery-stops";
 
 function requiredText(
   formData: FormData,
@@ -693,6 +694,8 @@ export async function markVehicleDeparted(
       "Departure blocked because the vehicle exceeds its space limit.",
     );
   }
+
+  await ensureDeliveryStopsForDispatch(dispatch.id);
 
   await prisma.dispatch.update({
     where: {

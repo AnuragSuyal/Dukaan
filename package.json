@@ -10,7 +10,8 @@
     "postinstall": "prisma generate",
     "db:seed": "tsx prisma/seed.ts",
     "db:reset": "prisma migrate reset --force",
-    "db:seed:operations": "tsx prisma/seed-operations.ts"
+    "db:seed:operations": "tsx prisma/seed-operations.ts",
+    "db:backfill:delivery-stops": "tsx prisma/backfill-delivery-stops.ts"
   },
   "dependencies": {
     "@prisma/adapter-better-sqlite3": "^7.9.1",

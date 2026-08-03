@@ -74,6 +74,15 @@ enum DispatchStatus {
   CANCELLED
 }
 
+enum DeliveryStopStatus {
+  PENDING
+  ARRIVED
+  DELIVERED
+  PARTIAL
+  FAILED
+  SKIPPED
+}
+
 model Distributor {
   id        String   @id @default(cuid())
   name      String
@@ -113,6 +122,7 @@ model Product {
   orderItems        OrderItem[]
   demandSignalItems DemandSignalItem[]
   dispatchItems     DispatchItem[]
+  deliveryStopItems DeliveryStopItem[]
 
   @@unique([distributorId, sku])
   @@index([distributorId, isActive])
@@ -161,6 +171,7 @@ model Shop {
   route         Route?         @relation(fields: [routeId], references: [id], onDelete: SetNull)
   orders        Order[]
   demandSignals DemandSignal[]
+  deliveryStops DeliveryStop[]
 
   @@unique([distributorId, phone])
   @@index([distributorId, status])
@@ -229,10 +240,11 @@ model DemandSignal {
   createdAt           DateTime     @default(now())
   updatedAt           DateTime     @updatedAt
 
-  distributor Distributor        @relation(fields: [distributorId], references: [id], onDelete: Cascade)
-  shop        Shop               @relation(fields: [shopId], references: [id], onDelete: Cascade)
-  route       Route?             @relation(fields: [routeId], references: [id], onDelete: SetNull)
-  items       DemandSignalItem[]
+  distributor   Distributor        @relation(fields: [distributorId], references: [id], onDelete: Cascade)
+  shop          Shop               @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  route         Route?             @relation(fields: [routeId], references: [id], onDelete: SetNull)
+  items         DemandSignalItem[]
+  deliveryStops DeliveryStop[]
 
   @@index([distributorId, targetDate])
   @@index([shopId, targetDate])
@@ -251,8 +263,9 @@ model DemandSignalItem {
   unitPricePaise      Int
   suggestedTotalPaise Int
 
-  demandSignal DemandSignal @relation(fields: [demandSignalId], references: [id], onDelete: Cascade)
-  product      Product      @relation(fields: [productId], references: [id], onDelete: Restrict)
+  demandSignal      DemandSignal       @relation(fields: [demandSignalId], references: [id], onDelete: Cascade)
+  product           Product            @relation(fields: [productId], references: [id], onDelete: Restrict)
+  deliveryStopItems DeliveryStopItem[]
 
   @@unique([demandSignalId, productId])
   @@index([productId])
@@ -321,6 +334,7 @@ model Dispatch {
   driver      Staff?         @relation("DispatchDriver", fields: [driverId], references: [id], onDelete: SetNull)
   salesman    Staff?         @relation("DispatchSalesman", fields: [salesmanId], references: [id], onDelete: SetNull)
   items       DispatchItem[]
+  stops       DeliveryStop[]
 
   @@unique([routeId, targetDate])
   @@index([distributorId, targetDate])
@@ -345,5 +359,58 @@ model DispatchItem {
   product  Product  @relation(fields: [productId], references: [id], onDelete: Restrict)
 
   @@unique([dispatchId, productId])
+  @@index([productId])
+}
+
+model DeliveryStop {
+  id                         String             @id @default(cuid())
+  dispatchId                 String
+  demandSignalId             String
+  shopId                     String
+  sequence                   Int
+  status                     DeliveryStopStatus @default(PENDING)
+  expectedValuePaise         Int                @default(0)
+  arrivedAt                  DateTime?
+  completedAt                DateTime?
+  paymentMethod              PaymentMethod?
+  currentOrderCollectedPaise Int                @default(0)
+  outstandingCollectedPaise  Int                @default(0)
+  creditExtendedPaise        Int                @default(0)
+  returnedCrates             Int                @default(0)
+  damagedItemsCollected      Int                @default(0)
+  shopkeeperName             String?
+  confirmationCode           String
+  driverNote                 String?
+  createdAt                  DateTime           @default(now())
+  updatedAt                  DateTime           @updatedAt
+
+  dispatch     Dispatch           @relation(fields: [dispatchId], references: [id], onDelete: Cascade)
+  demandSignal DemandSignal       @relation(fields: [demandSignalId], references: [id], onDelete: Cascade)
+  shop         Shop               @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  items        DeliveryStopItem[]
+
+  @@unique([dispatchId, demandSignalId])
+  @@index([dispatchId, sequence])
+  @@index([shopId])
+  @@index([status])
+}
+
+model DeliveryStopItem {
+  id                 String @id @default(cuid())
+  deliveryStopId     String
+  demandSignalItemId String
+  productId          String
+  orderedQuantity    Int
+  deliveredQuantity  Int    @default(0)
+  missingQuantity    Int    @default(0)
+  damagedQuantity    Int    @default(0)
+  returnedQuantity   Int    @default(0)
+  unitPricePaise     Int
+
+  deliveryStop     DeliveryStop     @relation(fields: [deliveryStopId], references: [id], onDelete: Cascade)
+  demandSignalItem DemandSignalItem @relation(fields: [demandSignalItemId], references: [id], onDelete: Restrict)
+  product          Product          @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@unique([deliveryStopId, demandSignalItemId])
   @@index([productId])
 }
