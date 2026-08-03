@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { getDashboardData } from "@/lib/dashboard";
 
 export const dynamic = "force-dynamic";
@@ -198,12 +199,12 @@ export default async function Home() {
                 </p>
 
                 <div className="mt-7 flex flex-wrap gap-3">
-                  <a
+                  <Link
                     href="/signals"
                     className="rounded-xl bg-emerald-400 px-4 py-2.5 text-sm font-bold text-slate-950 hover:bg-emerald-300"
                   >
                     Review demand signals
-                  </a>
+                  </Link>
                   <button className="rounded-xl border border-slate-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800">
                     Open confirmation queue
                   </button>
@@ -290,12 +291,12 @@ export default async function Home() {
                   </p>
                 </div>
 
-                <a
+                <Link
                   href="/signals"
                   className="text-sm font-semibold text-emerald-700"
                 >
                   View all
-                </a>
+                </Link>
               </div>
 
               <div className="overflow-x-auto">
@@ -444,7 +445,7 @@ export default async function Home() {
           </section>
 
           <footer className="py-8 text-center text-xs text-slate-400">
-            DukaanSignal pilot dashboard Â· Live Prisma data Â·{" "}
+            DukaanSignal pilot dashboard Ã‚Â· Live Prisma data Ã‚Â·{" "}
             {formatDate(data.targetDate)}
           </footer>
         </div>

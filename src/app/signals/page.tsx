@@ -333,7 +333,7 @@ export default async function SignalsPage({
                       : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                   }`}
                 >
-                  {statusLabels[status]} · {count}
+                  {statusLabels[status]} Â· {count}
                 </Link>
               );
             })}
@@ -356,12 +356,15 @@ export default async function SignalsPage({
               >
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <h3 className="font-black">
+                    <Link
+                      href={`/signals/${signal.id}`}
+                      className="font-black hover:text-emerald-700"
+                    >
                       {signal.shop.name}
-                    </h3>
+                    </Link>
 
                     <p className="mt-1 text-xs text-slate-400">
-                      {signal.shop.route?.code ?? "Unassigned"} ·{" "}
+                      {signal.shop.route?.code ?? "Unassigned"} Â·{" "}
                       {signal.shop.locality ?? "No locality"}
                     </p>
                   </div>
@@ -455,11 +458,14 @@ export default async function SignalsPage({
                     className="border-b border-slate-100 last:border-0 hover:bg-slate-50/70"
                   >
                     <td className="px-6 py-5">
-                      <p className="text-sm font-black">
+                      <Link
+                        href={`/signals/${signal.id}`}
+                        className="text-sm font-black hover:text-emerald-700"
+                      >
                         {signal.shop.name}
-                      </p>
+                      </Link>
                       <p className="mt-1 text-xs text-slate-400">
-                        {signal.shop.route?.code ?? "Unassigned"} ·{" "}
+                        {signal.shop.route?.code ?? "Unassigned"} Â·{" "}
                         {signal.shop.locality ?? "No locality"}
                       </p>
                     </td>
