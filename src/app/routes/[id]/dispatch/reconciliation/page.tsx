@@ -237,7 +237,7 @@ export default async function ReconciliationPage({
               className="rounded-xl bg-slate-950 px-5 py-3 text-sm font-black text-white disabled:opacity-40"
             >
               {reconciliation
-                ? "Refresh reconciliation preview"
+                ? "Refresh and reset draft values"
                 : "Create reconciliation draft"}
             </button>
           </form>

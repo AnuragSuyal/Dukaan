@@ -116,15 +116,7 @@ export async function createOrRefreshReconciliation(
       items: true,
     },
   });
-
-  const existingActualReturns = new Map(
-    existing?.items.map((item) => [
-      item.productId,
-      item.actualReturnQuantity,
-    ]) ?? [],
-  );
-
-  await prisma.$transaction(async (transaction) => {
+await prisma.$transaction(async (transaction) => {
     const reconciliation =
       await transaction.dispatchReconciliation.upsert({
         where: {
@@ -132,9 +124,20 @@ export async function createOrRefreshReconciliation(
         },
         update: {
           expectedCashPaise: workspace.expectedCashPaise,
+          declaredCashPaise: workspace.expectedCashPaise,
+          cashVariancePaise: 0,
+
           expectedUpiPaise: workspace.expectedUpiPaise,
+          verifiedUpiPaise: workspace.expectedUpiPaise,
+          upiVariancePaise: 0,
+
           expectedBankPaise: workspace.expectedBankPaise,
+          verifiedBankPaise: workspace.expectedBankPaise,
+          bankVariancePaise: 0,
+
           expectedMixedPaise: workspace.expectedMixedPaise,
+          declaredMixedPaise: workspace.expectedMixedPaise,
+          mixedVariancePaise: 0,
           totalDeliveredValuePaise:
             workspace.totalDeliveredValuePaise,
           totalCreditPaise: workspace.totalCreditPaise,
@@ -174,12 +177,7 @@ export async function createOrRefreshReconciliation(
     });
 
     await transaction.dispatchReconciliationItem.createMany({
-      data: workspace.products.map((product) => {
-        const actualReturnQuantity =
-          existingActualReturns.get(product.productId) ??
-          product.expectedReturnQuantity;
-
-        return {
+      data: workspace.products.map((product) => {        return {
           reconciliationId: reconciliation.id,
           productId: product.productId,
           loadedQuantity: product.loadedQuantity,
@@ -190,10 +188,9 @@ export async function createOrRefreshReconciliation(
             product.returnedFromShopsQuantity,
           expectedReturnQuantity:
             product.expectedReturnQuantity,
-          actualReturnQuantity,
-          varianceQuantity:
-            actualReturnQuantity -
+          actualReturnQuantity:
             product.expectedReturnQuantity,
+          varianceQuantity: 0,
         };
       }),
     });
