@@ -83,6 +83,11 @@ enum DeliveryStopStatus {
   SKIPPED
 }
 
+enum ReconciliationStatus {
+  DRAFT
+  FINALIZED
+}
+
 model Distributor {
   id        String   @id @default(cuid())
   name      String
@@ -118,11 +123,12 @@ model Product {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  distributor       Distributor        @relation(fields: [distributorId], references: [id], onDelete: Cascade)
-  orderItems        OrderItem[]
-  demandSignalItems DemandSignalItem[]
-  dispatchItems     DispatchItem[]
-  deliveryStopItems DeliveryStopItem[]
+  distributor         Distributor                  @relation(fields: [distributorId], references: [id], onDelete: Cascade)
+  orderItems          OrderItem[]
+  demandSignalItems   DemandSignalItem[]
+  dispatchItems       DispatchItem[]
+  deliveryStopItems   DeliveryStopItem[]
+  reconciliationItems DispatchReconciliationItem[]
 
   @@unique([distributorId, sku])
   @@index([distributorId, isActive])
@@ -328,13 +334,14 @@ model Dispatch {
   createdAt           DateTime       @default(now())
   updatedAt           DateTime       @updatedAt
 
-  distributor Distributor    @relation(fields: [distributorId], references: [id], onDelete: Cascade)
-  route       Route          @relation(fields: [routeId], references: [id], onDelete: Cascade)
-  vehicle     Vehicle?       @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
-  driver      Staff?         @relation("DispatchDriver", fields: [driverId], references: [id], onDelete: SetNull)
-  salesman    Staff?         @relation("DispatchSalesman", fields: [salesmanId], references: [id], onDelete: SetNull)
-  items       DispatchItem[]
-  stops       DeliveryStop[]
+  distributor    Distributor             @relation(fields: [distributorId], references: [id], onDelete: Cascade)
+  route          Route                   @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  vehicle        Vehicle?                @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  driver         Staff?                  @relation("DispatchDriver", fields: [driverId], references: [id], onDelete: SetNull)
+  salesman       Staff?                  @relation("DispatchSalesman", fields: [salesmanId], references: [id], onDelete: SetNull)
+  items          DispatchItem[]
+  stops          DeliveryStop[]
+  reconciliation DispatchReconciliation?
 
   @@unique([routeId, targetDate])
   @@index([distributorId, targetDate])
@@ -412,5 +419,56 @@ model DeliveryStopItem {
   product          Product          @relation(fields: [productId], references: [id], onDelete: Restrict)
 
   @@unique([deliveryStopId, demandSignalItemId])
+  @@index([productId])
+}
+
+model DispatchReconciliation {
+  id                             String               @id @default(cuid())
+  dispatchId                     String               @unique
+  status                         ReconciliationStatus @default(DRAFT)
+  expectedCashPaise              Int                  @default(0)
+  declaredCashPaise              Int                  @default(0)
+  cashVariancePaise              Int                  @default(0)
+  expectedUpiPaise               Int                  @default(0)
+  verifiedUpiPaise               Int                  @default(0)
+  upiVariancePaise               Int                  @default(0)
+  expectedBankPaise              Int                  @default(0)
+  verifiedBankPaise              Int                  @default(0)
+  bankVariancePaise              Int                  @default(0)
+  expectedMixedPaise             Int                  @default(0)
+  declaredMixedPaise             Int                  @default(0)
+  mixedVariancePaise             Int                  @default(0)
+  totalDeliveredValuePaise       Int                  @default(0)
+  totalCreditPaise               Int                  @default(0)
+  totalOutstandingCollectedPaise Int                  @default(0)
+  totalMissingUnits              Int                  @default(0)
+  totalDamagedUnits              Int                  @default(0)
+  totalReturnedFromShopsUnits    Int                  @default(0)
+  note                           String?
+  finalizedAt                    DateTime?
+  createdAt                      DateTime             @default(now())
+  updatedAt                      DateTime             @updatedAt
+
+  dispatch Dispatch                     @relation(fields: [dispatchId], references: [id], onDelete: Cascade)
+  items    DispatchReconciliationItem[]
+}
+
+model DispatchReconciliationItem {
+  id                        String @id @default(cuid())
+  reconciliationId          String
+  productId                 String
+  loadedQuantity            Int
+  deliveredQuantity         Int
+  missingQuantity           Int    @default(0)
+  damagedQuantity           Int    @default(0)
+  returnedFromShopsQuantity Int    @default(0)
+  expectedReturnQuantity    Int
+  actualReturnQuantity      Int    @default(0)
+  varianceQuantity          Int    @default(0)
+
+  reconciliation DispatchReconciliation @relation(fields: [reconciliationId], references: [id], onDelete: Cascade)
+  product        Product                @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@unique([reconciliationId, productId])
   @@index([productId])
 }

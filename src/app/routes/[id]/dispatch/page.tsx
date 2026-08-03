@@ -117,7 +117,16 @@ export default async function DispatchPage({
             </div>
           </div>
 
-          <PrintRouteSheet />
+          <div className="flex items-center gap-3">
+            <Link
+              href={`/routes/${route.id}/dispatch/reconciliation`}
+              className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 shadow-sm hover:bg-slate-50"
+            >
+              Reconciliation
+            </Link>
+
+            <PrintRouteSheet />
+          </div>
         </div>
       </header>
 
